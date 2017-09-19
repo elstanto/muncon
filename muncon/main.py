@@ -1,6 +1,5 @@
-from muncon.fileio import SnpFile
+from muncon.fileio import MeasFile
 
-s = SnpFile('../tests/data/test.s1p')
-s.read()
+m = MeasFile('/home/lstant/Documents/Stant/code/python/muncon/tests/data/MUF/interseries_1.meas')
+m.read()
 a = 5
-

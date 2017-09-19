@@ -17,7 +17,6 @@ class Usnp:
 
     def set_ports(self, ports):
         self.p = ports
-        return
 
     def get_ports(self):
         return self.p
@@ -30,36 +29,30 @@ class Usnp:
                 self.z0 = linspace(z0[0], z0[0], self.p)
         else:
             self.z0 = linspace(z0, z0, self.p)
-        return
 
     def get_z0(self):
         return self.z0
 
     def set_freqs(self, freqs):
         self.f = freqs
-        return
 
     def get_freqs(self):
         return self.f
 
     def set_sparams(self, sparams):
         self.s = sparams
-        return
 
     def set_covariance(self, covariance):
         self.v = covariance
-        return
 
     def get_covariance(self):
         return self.v
 
     def set_comments(self, comments):
         self.comments = comments
-        return
 
     def get_comments(self):
         return self.comments
 
     def add_comment(self, comment):
         self.comments.append(comment)
-        return
