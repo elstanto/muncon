@@ -31,14 +31,20 @@ class MeasFile(AbstractFileHandler):
     """
     def __init__(self, path):
         super(MeasFile, self).__init__(path)
-        self.use_MC_mean = False
         self.saved_measpath = ""
+        self.estimate = None
         self.mc_usnps = []
+        self.usnp = None
 
     def read(self, **kwargs):
         meas_xml = ET.parse(self.path)
         meas_root = meas_xml.getroot()
         self.saved_measpath = os.path.normpath(meas_root.attrib['FileName'].replace("\\", "/"))
+        estimate_path = meas_root.find(".//MeasSParams//SubItem[@Index='1']")
+        estimate_path = self.localize_path(estimate_path.attrib['Text'])
+        estimate = MeasSnpFile(estimate_path)
+        estimate.read()
+        self.estimate = estimate.get_usnp()
         for element in meas_root.findall(".//MonteCarloPerturbedSParams//SubItem[@Index='1']"):
             samplepath = self.localize_path(element.attrib['Text'])
             sample = MeasSnpFile(samplepath)
@@ -53,6 +59,10 @@ class MeasFile(AbstractFileHandler):
         local_prefix = self.path.replace(meas_suffix, "")
         local_samplepath = samplepath.replace(saved_base, local_prefix)
         return local_samplepath
+
+    def build_covariance(self, use_mc_mean):
+
+        pass
 
     def write(self, **kwargs):
         super(MeasFile, self).write()
