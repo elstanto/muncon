@@ -1,5 +1,7 @@
-from muncon.fileio import MeasFile
+from muncon.fileio import DsdFile, SnpFile
 
-m = MeasFile('/home/lstant/Documents/Stant/code/python/muncon/tests/data/MUF/interseries_1.meas')
-m.read()
-a = 5
+s = SnpFile('/home/lstant/Documents/Stant/code/python/muncon/tests/data/test.s2p')
+d = SnpFile('/home/lstant/Documents/Stant/code/python/muncon/tests/out.s2p')
+s.read()
+d.set_usnp(s.get_usnp())
+d.write()
