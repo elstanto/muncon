@@ -156,7 +156,7 @@ class SnpFile(AbstractFileHandler):
 
     def build_column_header(self):
         units = list(SnpFile.f_unit_dict.keys())[list(SnpFile.f_unit_dict.values()).index(self.f_multiplier)]
-        self.column_header = " ".join([units, "S", self.format, "R", str(int(self.get_usnp().get_z0()[0]))]) + "\n"
+        self.column_header = " ".join(["#", units, "S", self.format, "R", str(int(self.get_usnp().get_z0()[0]))]) + "\n"
 
 
 class MeasSnpFile(SnpFile):
