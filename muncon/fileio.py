@@ -3,7 +3,7 @@ import numpy as np
 import os
 from math import cos, sin, radians
 import xml.etree.ElementTree as ET
-from muncon.utils import Usnp, swap_s12_s21, pad_to_2port
+from muncon.utils import Usnp
 
 
 class AbstractFileHandler:
@@ -93,8 +93,7 @@ class SnpFile(AbstractFileHandler):
         super(SnpFile, self).read()
         with open(self.path, "r") as f:
             freqs = []
-            sparams_real = []
-            sparams_imag = []
+            sparams = []
             while True:
                 line = f.readline()
                 if not line:
@@ -107,15 +106,10 @@ class SnpFile(AbstractFileHandler):
                 else:
                     lineparts = [float(i) for i in line.split()]
                     freqs.append(lineparts[0]*self.f_multiplier)
-                    sparams = []
-                    for i in range(1, int((len(lineparts)-1)/2+1)):
-                        sparams.extend(self.get_ri_sparam([lineparts[2*i-1], lineparts[2*i]]))
-                    sparams_real.append(sparams[0:7:2])
-                    sparams_imag.append(sparams[1:8:2])
+                    sparams.append(lineparts[1:len(lineparts)])
             self.usnp.set_freqs(np.asarray(freqs))
-            self.usnp.set_sparams(np.vectorize(complex)(sparams_real, sparams_imag))
-            cov_zeros = np.zeros((len(freqs), self.usnp.get_ports()**2, self.usnp.get_ports()**2))
-            self.usnp.set_covariance(np.vectorize(complex)(cov_zeros, cov_zeros))
+            self.usnp.set_sparams(np.array(sparams))
+            self.usnp.set_covariance(np.zeros((len(freqs), 2*self.usnp.get_ports()**2, 2*self.usnp.get_ports()**2)))
 
     def get_ri_sparam(self, sparam):
         if self.format == "MA":
@@ -143,15 +137,13 @@ class SnpFile(AbstractFileHandler):
         self.f_multiplier = 1  # Hz
         self.format = "RI"
         self.build_column_header()
-        if usnp.get_ports() == 1:
-            sparams = pad_to_2port(sparams)
         with open(self.path, 'w') as f:
             for header_line in self.get_usnp().get_comments():
                 f.write(header_line)
             f.write(self.column_header)
-            for ifreq in range(1, len(usnp.get_freqs())):
+            for ifreq in range(0, len(usnp.get_freqs())):
                 f.write(str(usnp.get_freqs()[ifreq] / self.f_multiplier) + " ")
-                f.write(" ".join(" ".join([str(np.real(e)), str(np.imag(e))]) for e in sparams[ifreq]))
+                f.write(" ".join([str(e) for e in sparams[ifreq]]))
                 f.write("\n")
 
     def build_column_header(self):
@@ -190,34 +182,35 @@ class DsdFile(AbstractFileHandler):
 
     def write(self, **kwargs):
         super(DsdFile, self).write()
-        title = "MMS4 Definition Standard Data\n"
-        filename_header = "Filename: " + self.path + "\n"
-        header = "This file contains the standard definition S-parameters and their uncertainty covariance matrix.\n" \
-                 "A comment line begins with the exclamation mark '!'.\n" \
-                 "Each frequency corresponds to a line with 74 columns, ordered as below:\n" \
-                 "freq(GHz) Nports S11r S11i S12r S12i S21r S21i S22r S22i (continues below)\n" \
-                 "V11,11rr V11,11ri V11,11ir V11,11ii V11,12rr V11,12ri V11,12ir V11,12ii V11,21rr V11,21ri V11,21ir " \
-                 "V11,21ii V11,22rr V11,22ri V11,22ir V11,22ii (cont.)\n" \
-                 "V12,11rr V12,11ri V12,11ir V12,11ii V12,12rr V12,12ri V12,12ir V12,12ii V12,21rr V12,21ri V12,21ir " \
-                 "V12,21ii V12,22rr V12,22ri V12,22ir V12,22ii (cont.)\n" \
-                 "V21,11rr V21,11ri V21,11ir V21,11ii V21,12rr V21,12ri V21,12ir V21,12ii V21,21rr V21,21ri V21,21ir " \
-                 "V21,21ii V21,22rr V21,22ri V21,22ir V21,22ii (cont.)\n" \
-                 "V22,11rr V22,11ri V22,11ir V22,11ii V22,12rr V22,12ri V22,12ir V22,12ii V22,21rr V22,21ri V22,21ir " \
-                 "V22,21ii V22,22rr V22,22ri V22,22ir V22,22ii (cont.)\n" \
-                 "where 'r' stands for real and 'i' for imaginary parts\n" \
-                 "One-port standards (Nports=1) have zeros in 12, 21 and 22 parameters\n"
+        title = "!MMS4 Definition Standard Data\n"
+        filename_header = "!Filename: " + self.path + "\n"
+        header = "!This file contains the standard definition S-parameters and their uncertainty covariance matrix.\n" \
+                 "!A comment line begins with the exclamation mark '!'.\n" \
+                 "!Each frequency corresponds to a line with 74 columns, ordered as below:\n" \
+                 "!freq(GHz) Nports S11r S11i S12r S12i S21r S21i S22r S22i (continues below)\n" \
+                 "!V11,11rr V11,11ri V11,11ir V11,11ii V11,12rr V11,12ri V11,12ir V11,12ii V11,21rr V11,21ri V11,21ir " \
+                 "!V11,21ii V11,22rr V11,22ri V11,22ir V11,22ii (cont.)\n" \
+                 "!V12,11rr V12,11ri V12,11ir V12,11ii V12,12rr V12,12ri V12,12ir V12,12ii V12,21rr V12,21ri V12,21ir " \
+                 "!V12,21ii V12,22rr V12,22ri V12,22ir V12,22ii (cont.)\n" \
+                 "!V21,11rr V21,11ri V21,11ir V21,11ii V21,12rr V21,12ri V21,12ir V21,12ii V21,21rr V21,21ri V21,21ir " \
+                 "!V21,21ii V21,22rr V21,22ri V21,22ir V21,22ii (cont.)\n" \
+                 "!V22,11rr V22,11ri V22,11ir V22,11ii V22,12rr V22,12ri V22,12ir V22,12ii V22,21rr V22,21ri V22,21ir " \
+                 "!V22,21ii V22,22rr V22,22ri V22,22ir V22,22ii (cont.)\n" \
+                 "!where 'r' stands for real and 'i' for imaginary parts\n" \
+                 "!One-port standards (Nports=1) have zeros in 12, 21 and 22 parameters\n"
         usnp = self.get_usnp()
         sparams = usnp.get_sparams()
         if usnp.get_ports() == 1:
-            sparams = pad_to_2port(sparams)
-        sparams = swap_s12_s21(sparams)
+            sparams = usnp.pad_to_2port()
+        sparams = usnp.swap_s12_s21()
         with open(self.path, 'w') as f:
             f.write(title)
             f.write(filename_header)
             f.write(header)
             for ifreq in range(1, len(usnp.get_freqs())):
                 f.write(str(usnp.get_freqs()[ifreq]/1e9) + " ")
-                f.write(" ".join(" ".join([str(np.real(e)), str(np.imag(e))]) for e in sparams[ifreq]))
+                f.write("2.0 ")
+                f.write(" ".join([str(e) for e in sparams[ifreq]]))
                 f.write("\n")
 
 

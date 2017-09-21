@@ -60,41 +60,39 @@ class Usnp:
     def add_comment(self, comment):
         self.comments.append(comment)
 
+    def pad_to_2port(self):
+        sparams_2p = zeros((len(self.s), 8))
+        sparams_2p[:, 0:2] = self.s[:, 0:2]
+        return sparams_2p
 
-def pad_to_2port(sparams):
-    temp_zeros = zeros((len(sparams)[0], 4))
-    sparams = vectorize(complex)(temp_zeros, temp_zeros)
-    sparams[:, 0] = sparams[0]
-    return sparams
+    def swap_s12_s21(self):
+        sparams = self.s.copy()
+        s21 = self.s[:, 2:4].copy()
+        sparams[:, 2:4] = self.s[:, 4:6]  # S21 > S12
+        sparams[:, 4:6] = s21  # S12 > S21
+        return sparams
 
-
-def swap_s12_s21(sparams):
-    s21 = sparams[:, 1].copy()
-    sparams[:, 1] = sparams[:, 2]  # S21 > S12
-    sparams[:, 2] = s21  # S12 > S21
-    return sparams
-
-
-def format_sparam(sparam, old_format, new_format):
-    if old_format == new_format:
-        return sparam
-    elif old_format == "RI":
-        if new_format == "MA":
-            return
-        elif new_format == "DB":
-            return
-    elif old_format == "MA":
-        if new_format == "RI":
-            ri_sparam = [sparam[0]*cos(radians(sparam[1])), sparam[0]*sin(radians(sparam[1]))]
-            return ri_sparam
-        elif new_format == "DB":
-            return
-    elif old_format == "DB":
-        if new_format == "RI":
-            linear_mag = 10**(sparam[0]/20)
-            ri_sparam = [linear_mag * cos(radians(sparam[1])), linear_mag * sin(radians(sparam[1]))]
-            return ri_sparam
-        elif new_format == "MA":
-            return
-    else:  # Handles no column header
-        return sparam
+    def format_sparam(sparam, old_format, new_format):
+        #TODO
+        if old_format == new_format:
+            return sparam
+        elif old_format == "RI":
+            if new_format == "MA":
+                return
+            elif new_format == "DB":
+                return
+        elif old_format == "MA":
+            if new_format == "RI":
+                ri_sparam = [sparam[0]*cos(radians(sparam[1])), sparam[0]*sin(radians(sparam[1]))]
+                return ri_sparam
+            elif new_format == "DB":
+                return
+        elif old_format == "DB":
+            if new_format == "RI":
+                linear_mag = 10**(sparam[0]/20)
+                ri_sparam = [linear_mag * cos(radians(sparam[1])), linear_mag * sin(radians(sparam[1]))]
+                return ri_sparam
+            elif new_format == "MA":
+                return
+        else:  # Handles no column header
+            return sparam
