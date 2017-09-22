@@ -60,17 +60,28 @@ class Usnp:
     def add_comment(self, comment):
         self.comments.append(comment)
 
-    def pad_to_2port(self):
-        sparams_2p = zeros((len(self.s), 8))
-        sparams_2p[:, 0:2] = self.s[:, 0:2]
+    @staticmethod
+    def pad_to_2port(sparams):
+        sparams_2p = zeros((len(sparams), 8))
+        sparams_2p[:, 0:2] = sparams[:, 0:2]
         return sparams_2p
 
-    def swap_s12_s21(self):
-        sparams = self.s.copy()
-        s21 = self.s[:, 2:4].copy()
-        sparams[:, 2:4] = self.s[:, 4:6]  # S21 > S12
-        sparams[:, 4:6] = s21  # S12 > S21
+    @staticmethod
+    def swap_s12_s21(sparams):
+        # s21 = sparams[:, 2:4].copy()
+        # sparams[:, 2:4] = sparams[:, 4:6]  # S21 > S12
+        # sparams[:, 4:6] = s21  # S12 > S21
+        sparams[:, [2, 4]] = sparams[:, [4, 2]]
+        sparams[:, [3, 5]] = sparams[:, [5, 3]]
         return sparams
+
+    @staticmethod
+    def swap_v12_v21(covariance):
+        covariance[:, [2, 4]] = covariance[:, [4, 2]]
+        covariance[:, [3, 5]] = covariance[:, [5, 3]]
+        covariance[[2, 4], :] = covariance[[4, 2], :]
+        covariance[[3, 5], :] = covariance[[5, 3], :]
+        return covariance
 
     def format_sparam(sparam, old_format, new_format):
         #TODO

@@ -1,7 +1,7 @@
-from muncon.fileio import DsdFile, SnpFile
+from muncon.fileio import MeasFile, DsdFile
 
-s = SnpFile("C:\\Users\\helgr\\PycharmProjects\\muncon\\tests\\data\\test.s2p")
-d = DsdFile("C:\\Users\\helgr\\PycharmProjects\\muncon\\tests\\data\\out.dsd")
-s.read()
-d.set_usnp(s.get_usnp())
-d.write()
+m = MeasFile('C:\\Users\\helgr\\PycharmProjects\\muncon\\tests\\data\\MUF\\interseries_1.meas')
+m.read()
+m.load_mc_samples()
+m.build_mc_covariance(True)
+m.mc_from_cv()

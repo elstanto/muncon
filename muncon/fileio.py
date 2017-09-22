@@ -36,8 +36,10 @@ class MeasFile(AbstractFileHandler):
         super(MeasFile, self).__init__(path)
         self.saved_measpath = ""
         self.estimate = None
+        self.mc_paths = []
+        self.cv_paths = []
         self.mc_usnps = []
-        self.usnp = None
+        self.cv_usnps = []
 
     def read(self, **kwargs):
         meas_xml = ET.parse(self.path)
@@ -50,10 +52,25 @@ class MeasFile(AbstractFileHandler):
         self.estimate = estimate.get_usnp()
         for element in meas_root.findall(".//MonteCarloPerturbedSParams//SubItem[@Index='1']"):
             samplepath = self.localize_path(element.attrib['Text'])
+            self.mc_paths.append(samplepath)
+        for element in meas_root.findall(".//PerturbedSParams//SubItem[@Index='1']"):
+            samplepath = self.localize_path(element.attrib['Text'])
+            self.cv_paths.append(samplepath)
+        super(MeasFile, self).read()
+
+    def load_mc_samples(self):
+        self.mc_usnps = []
+        for samplepath in self.mc_paths:
             sample = MeasSnpFile(samplepath)
             sample.read()
             self.mc_usnps.append(sample.get_usnp())
-        super(MeasFile, self).read()
+
+    def load_cv_samples(self):
+        self.cv_usnps = []
+        for samplepath in self.cv_paths:
+            sample = MeasSnpFile(samplepath)
+            sample.read()
+            self.cv_usnps.append(sample.get_usnp())
 
     def localize_path(self, path):
         samplepath = os.path.normpath(path.replace("\\", "/"))
@@ -63,9 +80,56 @@ class MeasFile(AbstractFileHandler):
         local_samplepath = samplepath.replace(saved_base, local_prefix)
         return local_samplepath
 
-    def build_covariance(self, use_mc_mean):
+    def build_mc_covariance(self, use_mc_mean):
+        sparam_array = np.array([usnp.s for usnp in self.mc_usnps])
+        if use_mc_mean:
+            mean = sparam_array.mean(0)
+        else:
+            mean = self.estimate.s
+        covariance = MeasFile.build_covariance(sparam_array, mean)
+        self.usnp.set_ports(self.estimate.get_ports())
+        self.usnp.set_freqs(self.estimate.get_freqs())
+        self.usnp.set_z0(self.estimate.get_z0())
+        self.usnp.set_sparams(mean)
+        self.usnp.set_covariance(covariance)
 
-        pass
+    def build_cv_covariance(self):
+        sparam_array = np.array([usnp.s for usnp in self.cv_usnps])
+        mean = self.estimate.s
+        covariance = MeasFile.build_covariance(sparam_array, mean)
+        self.usnp.set_ports(self.estimate.get_ports())
+        self.usnp.set_freqs(self.estimate.get_freqs())
+        self.usnp.set_z0(self.estimate.get_z0())
+        self.usnp.set_sparams(mean)
+        self.usnp.set_covariance(covariance)
+
+    @staticmethod
+    def build_covariance(sparam_array, mean):
+        deviations = sparam_array - mean
+        deviations = np.swapaxes(deviations, 0, 1)  # Swap frequency and repeat axis
+        # Below is the alternate identical version using numpy builtin cov():
+        # sparam_array = np.swapaxes(sparam_array, 0, 1)  # Swap frequency and repeat axis
+        # test = np.cov(sparam_array_f.transpose() for sparam_array_f in sparam_array)
+        covariance = np.array([np.dot(deviations_f.transpose(), deviations_f) for deviations_f in deviations])
+        covariance = covariance / (len(sparam_array) - 1)  # Normalise
+        return covariance
+
+    def mc_from_cv(self):
+        covariance = self.usnp.get_covariance()[0]
+        try:
+            r = np.linalg.cholesky(covariance)
+        except np.linalg.linalg.LinAlgError as err:
+            covariance = MeasFile.repair_cv(covariance)
+            r = np.linalg.cholesky(covariance)
+        a=2
+
+    @staticmethod
+    def repair_cv(v):
+        d, q = np.linalg.eig(np.triu(v, 1) + np.diag(np.diag(v)) + np.tril(v, -1))
+        eps = np.finfo(float).eps
+        d_rep = np.maximum(d.transpose(), eps*np.max(d)*np.ones(len(v)))
+        v_rep = np.dot(q, np.dot(np.diag(d_rep), q.transpose()))
+        return v_rep
 
     def write(self, **kwargs):
         super(MeasFile, self).write()
@@ -201,8 +265,10 @@ class DsdFile(AbstractFileHandler):
         usnp = self.get_usnp()
         sparams = usnp.get_sparams()
         if usnp.get_ports() == 1:
-            sparams = usnp.pad_to_2port()
-        sparams = usnp.swap_s12_s21()
+            sparams = usnp.pad_to_2port(sparams)
+        sparams = usnp.swap_s12_s21(sparams)
+        covariance = usnp.get_covariance()
+        covariance = usnp.swap_v12_v21(covariance)
         with open(self.path, 'w') as f:
             f.write(title)
             f.write(filename_header)
@@ -210,7 +276,7 @@ class DsdFile(AbstractFileHandler):
             for ifreq in range(1, len(usnp.get_freqs())):
                 f.write(str(usnp.get_freqs()[ifreq]/1e9) + " ")
                 f.write("2.0 ")
-                f.write(" ".join([str(e) for e in sparams[ifreq]]))
+                f.write(" ".join([str(e) for e in sparams[ifreq]]) + " ")
+                f.write(" ".join([str(term) for term in np.ravel([np.hsplit(row, 2) for row in
+                                                                  np.hsplit(covariance[ifreq], 2)])]))
                 f.write("\n")
-
-
