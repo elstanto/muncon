@@ -117,17 +117,20 @@ class MeasFile(AbstractFileHandler):
     def mc_from_cv(self):
         covariance = self.usnp.get_covariance()[0]
         try:
-            r = np.linalg.cholesky(covariance)
+            r = np.linalg.cholesky(2*covariance)
         except np.linalg.linalg.LinAlgError as err:
-            covariance = MeasFile.repair_cv(covariance)
-            r = np.linalg.cholesky(covariance)
+            covariance2 = MeasFile.repair_cv(2*covariance)
+            covariance2 = np.real(covariance2)
+            r = np.linalg.cholesky(covariance2)
         a=2
 
     @staticmethod
     def repair_cv(v):
-        d, q = np.linalg.eig(np.triu(v, 1) + np.diag(np.diag(v)) + np.tril(v, -1))
+        # v2 = np.triu(np.triu(v), 1) + np.diag(np.diag(np.triu(v))) + np.tril(np.triu(v), -1)
+        d, q = np.linalg.eig(v)
+        # d2, q2 = np.linalg.eig(v2)
         eps = np.finfo(float).eps
-        d_rep = np.maximum(d.transpose(), eps*np.max(d)*np.ones(len(v)))
+        d_rep = np.maximum(d.transpose(), np.zeros(len(v)))
         v_rep = np.dot(q, np.dot(np.diag(d_rep), q.transpose()))
         return v_rep
 
@@ -273,7 +276,7 @@ class DsdFile(AbstractFileHandler):
             f.write(title)
             f.write(filename_header)
             f.write(header)
-            for ifreq in range(1, len(usnp.get_freqs())):
+            for ifreq in range(0, len(usnp.get_freqs())):
                 f.write(str(usnp.get_freqs()[ifreq]/1e9) + " ")
                 f.write("2.0 ")
                 f.write(" ".join([str(e) for e in sparams[ifreq]]) + " ")
