@@ -61,6 +61,7 @@ class MeasFile(AbstractFileHandler):
     def load_mc_samples(self):
         self.mc_usnps = []
         for samplepath in self.mc_paths:
+            print('Reading MC sample ' + samplepath)
             sample = MeasSnpFile(samplepath)
             sample.read()
             self.mc_usnps.append(sample.get_usnp())
@@ -114,23 +115,37 @@ class MeasFile(AbstractFileHandler):
         covariance = covariance / (len(sparam_array) - 1)  # Normalise
         return covariance
 
-    def mc_from_cv(self):
-        covariance = self.usnp.get_covariance()[0]
-        try:
-            r = np.linalg.cholesky(2*covariance)
-        except np.linalg.linalg.LinAlgError as err:
-            covariance2 = MeasFile.repair_cv(2*covariance)
-            covariance2 = np.real(covariance2)
-            r = np.linalg.cholesky(covariance2)
-        a=2
+    def mc_from_cv(self, n):
+        # Get Cholesky factors
+        chol = []
+        for i_freq in range(0, len(self.usnp.get_freqs())):
+            cov = self.usnp.get_covariance()[i_freq]
+            try:
+                chol.append(np.linalg.cholesky(cov))
+            except np.linalg.linalg.LinAlgError as err:
+                cov_rep = MeasFile.repair_cv(cov)
+                chol.append(np.linalg.cholesky(cov_rep))
+        # Make samples
+        mean = self.usnp.get_sparams()
+        sample = np.copy(mean)
+        for m in range(0,n):
+            print('Sampling ' + str(m))
+            u = Usnp()
+            u.set_freqs(self.usnp.get_freqs())
+            u.set_z0(self.usnp.get_z0())
+            u.set_ports(self.usnp.get_ports())
+            for i_freq in range(0,len(chol)):
+                random = np.random.rand(len(chol[0]))
+                sample[i_freq] = sample[i_freq] + np.dot(chol[i_freq].transpose(), random)
+            u.set_sparams(sample)
+            self.mc_usnps.append(u)
 
     @staticmethod
     def repair_cv(v):
-        # v2 = np.triu(np.triu(v), 1) + np.diag(np.diag(np.triu(v))) + np.tril(np.triu(v), -1)
-        d, q = np.linalg.eig(v)
-        # d2, q2 = np.linalg.eig(v2)
+        v2 = np.triu(v, 1) + np.diag(np.diag(v)) + np.tril(v, -1)
+        d, q = np.linalg.eigh(v2)
         eps = np.finfo(float).eps
-        d_rep = np.maximum(d.transpose(), np.zeros(len(v)))
+        d_rep = np.maximum(d.transpose(), eps*np.ones(len(v)))
         v_rep = np.dot(q, np.dot(np.diag(d_rep), q.transpose()))
         return v_rep
 
@@ -146,7 +161,7 @@ class SnpFile(AbstractFileHandler):
         'Hz': 1,
         'KHz': 1e3,
         'MHz': 1e6,
-        'GHz': 1e9
+        'GHZ': 1e9
     }
 
     def __init__(self, path):
